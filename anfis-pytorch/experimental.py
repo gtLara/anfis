@@ -69,8 +69,9 @@ def plotResults(y_actual, y_predicted):
         Plot the actual and predicted y values (in different colours).
     '''
     plt.plot(range(len(y_predicted)), y_predicted.detach().numpy(),
-             'r', label='trained')
-    plt.plot(range(len(y_actual)), y_actual.numpy(), 'b', label='original')
+            'r', linestyle=":", label='trained', linewidth=3)
+    plt.plot(range(len(y_actual)), y_actual.numpy(), 'b', label='original',
+            linewidth=1)
     plt.legend(loc='upper left')
     plt.show()
 
