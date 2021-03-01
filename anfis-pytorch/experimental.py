@@ -146,7 +146,7 @@ def train_anfis_with(model, data, optimizer, criterion,
         # Get the error rate for the whole batch:
         y_pred = model(x)
         mse, rmse, perc_loss = calc_error(y_pred, y_actual)
-        errors.append(perc_loss)
+        errors.append(mse)
         # Print some progress information as the net is trained:
         if epochs < 30 or t % 10 == 0:
             print('epoch {:4d}: MSE={:.5f}, RMSE={:.5f} ={:.2f}%'
