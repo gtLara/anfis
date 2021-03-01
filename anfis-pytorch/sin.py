@@ -16,6 +16,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 import anfis
 from membership import BellMembFunc, make_bell_mfs
+from membership import GaussMembFunc, make_gauss_mfs
 from experimental import train_anfis, test_anfis
 
 dtype = torch.float
@@ -43,9 +44,12 @@ def ex1_model():
     '''
         Define modelo e parametros para funcoes de pertinencia
     '''
-    invardefs = [
-            ('x0', make_bell_mfs(3.33333, 2, list(np.linspace(0, 2*np.pi, 3))))
-            ]
+    # invardefs = [
+    #         ('x0', make_bell_mfs(3.33333, 2, list(np.linspace(0, 2*np.pi, 3))))
+    #         ]
+    invardefs = [('x0', 
+                  make_gauss_mfs(sigma = 1.2, mu_list = np.linspace(0, 2*np.pi, 3)))
+                 ]
     outvars = ['y0']
 
     anf = anfis.AnfisNet('Aproximacao senoidal', invardefs, outvars)
