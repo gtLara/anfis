@@ -32,7 +32,7 @@ def make_sin(batch_size=1024):
     '''
 
     x = torch.linspace(0, 2*np.pi, 500).reshape(-1, 1)
-    y = torch.tensor([np.sin(p) for p in x], dtype=dtype).reshape(-1, 1)
+    y = torch.tensor([sin(p) for p in x], dtype=dtype).reshape(-1, 1)
 
     plt.plot(x, y)
     plt.show()
