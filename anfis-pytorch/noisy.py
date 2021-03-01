@@ -23,16 +23,16 @@ dtype = torch.float
 
 ##### Example 1: Modeling a Two-Input Nonlinear Function #####
 
-def sin(x):
-    return np.sin(x)
+def noisy_sin(x):
+    return np.sin(x) + 0.1 * np.random.normal(0, 1, 1)
 
-def make_sin(batch_size=1024):
+def make_noisy_sin(batch_size=1024):
     '''
         Gera funcao seno
     '''
 
-    x = torch.linspace(0, 2*np.pi, 500).reshape(-1, 1)
-    y = torch.tensor([sin(p) for p in x], dtype=dtype).reshape(-1, 1)
+    x = torch.linspace(0, 2*np.pi, 100).reshape(-1, 1)
+    y = torch.tensor([noisy_sin(p) for p in x], dtype=dtype).reshape(-1, 1)
 
     plt.plot(x, y)
     plt.show()
@@ -57,5 +57,5 @@ def ex1_model():
 
 if __name__ == '__main__':
     model = ex1_model()
-    train_data = make_sin(batch_size = 100)
+    train_data = make_noisy_sin(batch_size = 100)
     train_anfis(model, train_data, 20, True)
