@@ -23,6 +23,40 @@ dtype = torch.float
 
 ##### Problema 3: Previsao de uma serie temporal #####
 
+def data(partition):
+    '''
+        Gera os quatro instantes de dados e saida
+    '''
+    
+    # loading data set
+    data = loadmat('mg.mat')
+    data = pd.DataFrame(data['x'])
+    lendata = len(data)
+    
+    # 80/20
+    data = data.to_numpy()
+    limit = int(0.8 * lendata)
+    
+    if partition == 'train':
+        const = limit - 18
+        cycle = range(18, limit)
+    if partition == 'test':
+        const = lendata - limit - 6
+        cycle = range(limit, lendata - 6)
+    
+    # quatro instantes e futuro
+    x = torch.zeros((const, 4))
+    y = torch.zeros((const, 1))
+    for idx, t in enumerate(cycle):
+        x[idx, 0] = torch.tensor(data[t - 18])
+        x[idx, 1] = torch.tensor(data[t - 12])
+        x[idx, 2] = torch.tensor(data[t - 6])
+        x[idx, 3] = torch.tensor(data[t - 0])
+        y[idx, 0] = torch.tensor(data[t + 6])
+    
+    td = TensorDataset(x, y)
+    return DataLoader(td, batch_size = 1024, shuffle = True)
+        
 def training_data(batch_size = 1024):
     '''
         Gera os quatro instantes de dados e saida
@@ -37,17 +71,15 @@ def training_data(batch_size = 1024):
     limit = int(0.8 * lendata)
     
     # quatro instantes e futuro
-    train = np.zeros(shape = [limit - 18, 5])
+    x = torch.zeros((limit - 18, 4))
+    y = torch.zeros((limit - 18, 1))
     for idx, t in enumerate(range(18, limit)):
-        train[idx, 0] = data[t - 18]
-        train[idx, 1] = data[t - 12]
-        train[idx, 2] = data[t - 6]
-        train[idx, 3] = data[t - 0]
-        train[idx, 4] = data[t + 6]
+        x[idx, 0] = torch.tensor(data[t - 18])
+        x[idx, 1] = torch.tensor(data[t - 12])
+        x[idx, 2] = torch.tensor(data[t - 6])
+        x[idx, 3] = torch.tensor(data[t - 0])
+        y[idx, 0] = torch.tensor(data[t + 6])
     
-    # return train
-    x = torch.tensor(train[:, 0:4])
-    y = torch.tensor(train[:, 4])
     td = TensorDataset(x, y)
     return DataLoader(td, batch_size = batch_size, shuffle = True)
 
@@ -65,27 +97,25 @@ def testing_data():
     limit = int(0.8 * lendata)
     
     # quatro instantes e futuro
-    test = np.zeros(shape = [lendata - limit - 6, 5])
+    x = torch.zeros((lendata - limit - 6, 4))
+    y = torch.zeros((lendata - limit - 6, 1))
     for idx, t in enumerate(range(limit, lendata - 6)):
-        test[idx, 0] = data[t - 18]
-        test[idx, 1] = data[t - 12]
-        test[idx, 2] = data[t - 6]
-        test[idx, 3] = data[t - 0]
-        test[idx, 4] = data[t + 6]
+        x[idx, 0] = torch.tensor(data[t - 18])
+        x[idx, 1] = torch.tensor(data[t - 12])
+        x[idx, 2] = torch.tensor(data[t - 6])
+        x[idx, 3] = torch.tensor(data[t - 0])
+        y[idx, 0] = torch.tensor(data[t + 6])
     
-    # return test
-    x = torch.tensor(test[:, 0:4])
-    y = torch.tensor(test[:, 4])
     td = TensorDataset(x, y)
     return DataLoader(td)
 
 def model():
     invardefs = [
         # ainda n escolhi os centros e sigma
-        ('x(t-18)', make_gauss_mfs(sigma = 1.2, mu_list = [0, 1])),
-        ('x(t-12)', make_gauss_mfs(sigma = 1.2, mu_list = [0, 1])),
-        ('x(t-6)', make_gauss_mfs(sigma = 1.2, mu_list = [0, 1])),
-        ('x(t)', make_gauss_mfs(sigma = 1.2, mu_list = [0, 1]))
+        ('x(t-18)', make_gauss_mfs(sigma = 0.2, mu_list = [0.4, 1.2])),
+        ('x(t-12)', make_gauss_mfs(sigma = 0.2, mu_list = [0.4, 1.2])),
+        ('x(t-6)', make_gauss_mfs(sigma = 0.2, mu_list = [0.4, 1.2])),
+        ('x(t)', make_gauss_mfs(sigma = 0.2, mu_list = [0.4, 1.2]))
         ]
     outvars = ['ys']
     
@@ -94,7 +124,7 @@ def model():
 
 if __name__ == '__main__':
     model = model()
-    train_data = training_data(batch_size = 100)
+    train_data = data(partition = 'train')
     train_anfis(model, data = train_data, epochs = 20, show_plots = True)
-    test_data = testing_data()
+    test_data = data(partition = 'test')
     test_anfis(model, data = test_data, show_plots = True)
