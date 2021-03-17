@@ -19,9 +19,10 @@ import anfis
 from membership import GaussMembFunc, make_gauss_mfs
 from experimental import train_anfis, test_anfis
 
-dtype = torch.float
+from cmenas import cmenas
+from norm import normalize, denormalize
 
-##### Problema 3: Previsao de uma serie temporal #####
+dtype = torch.float
 
 def data(partition):
     # loading data set
@@ -39,16 +40,6 @@ def data(partition):
     if partition == 'test':
         idx = idx[int(eta * length):]
     
-    # # x, y
-    # x = data[idx, 0:data.shape[1] - 1]
-    # y = data[idx, data.shape[1]- 1]
-    # y[y != 'Iris-setosa'] = -1
-    # y[y == 'Iris-setosa'] = 1
-    
-    # # torch
-    # x = torch.tensor(np.array(x, dtype = np.float))
-    # y = torch.tensor(np.array(y, dtype = np.float))
-    
     # copiei do anterior pq acima deu problema de float / double
     data[data[:, data.shape[1] - 1] != 'Iris-setosa', data.shape[1]- 1] = 1
     data[data[:, data.shape[1] - 1] == 'Iris-setosa', data.shape[1]- 1] = -1
@@ -65,21 +56,35 @@ def data(partition):
     td = TensorDataset(x, y)
     return DataLoader(td, batch_size = 1024, shuffle = True)
         
-def model():
-    invardefs = [
-        ('SepalLengthCm', make_gauss_mfs(sigma = 0.2, mu_list = [0.4, 1.2])),
-        ('SepalWidthCm', make_gauss_mfs(sigma = 0.2, mu_list = [0.4, 1.2])),
-        ('PetalLengthCm', make_gauss_mfs(sigma = 0.2, mu_list = [0.4, 1.2])),
-        ('PetalWidthCm', make_gauss_mfs(sigma = 0.2, mu_list = [0.4, 1.2]))
-        ]
+def model(data):
+    
+    # numpy and norm
+    x, y = data.dataset.tensors
+    x = x.numpy()
+    x, minimum, maximum = normalize(data = x)
+    
+    # cmeans
+    modelo = cmenas(k = 2)
+    modelo.train(data = x, MAX = 15, tol = 1e-2)
+    centros = modelo.C
+    
+    # denorm
+    centros = denormalize(data = centros, m = minimum, M = maximum)
+    
+    def mk_var(name, centros, i):   # de iris_example
+        return (name, make_gauss_mfs(1, [centros[0, i], centros[1, i]]))
+    invardefs = [mk_var(name, centros, i) for i, name in
+                 enumerate(['SepalLengthCm', 'SepalWidthCm', 
+                  'PetalLengthCm', 'PetalWidthCm'])]
+    
     outvars = ['Species']
     
     model = anfis.AnfisNet('iris', invardefs, outvars)
     return model
 
 if __name__ == '__main__':
-    model = model()
     train_data = data(partition = 'train')
+    model = model(train_data)
     train_anfis(model, data = train_data, epochs = 20, show_plots = True)
     test_data = data(partition = 'test')
     test_anfis(model, data = test_data, show_plots = True)

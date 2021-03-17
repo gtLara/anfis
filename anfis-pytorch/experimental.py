@@ -114,6 +114,8 @@ def test_anfis(model, data, show_plots=False):
         plot_all_mfs(model, x)
     print('### Testing for {} cases'.format(x.shape[0]))
     y_pred = model(x)
+    # degrau
+    y_pred = torch.sign(y_pred)
     mse, rmse, perc_loss = calc_error(y_pred, y_actual)
     print('MS error={:.5f}, RMS error={:.5f}, percentage={:.2f}%'
           .format(mse, rmse, perc_loss))
