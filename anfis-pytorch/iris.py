@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 '''
     ANFIS in torch: Examples from Jang's paper
     @author: James Power <james.power@mu.ie> Apr 12 18:13:10 2019
@@ -24,26 +22,30 @@ from norm import normalize, denormalize
 
 dtype = torch.float
 
+def kmeans_data(k=10):
+    pass
+
 def data(partition):
     # loading data set
     data = pd.read_csv('data/iris.csv').dropna().drop(columns = ['Id'])
-    
+
     # 70 / 30
     data = data.to_numpy()
     length = len(data)
     idx = np.arange(length)
     np.random.shuffle(idx)
-    
+
     eta = 0.7
+
     if partition == 'train':
         idx = idx[:int(eta * length)]
     if partition == 'test':
         idx = idx[int(eta * length):]
-    
+
     # copiei do anterior pq acima deu problema de float / double
     data[data[:, data.shape[1] - 1] != 'Iris-setosa', data.shape[1]- 1] = 1
     data[data[:, data.shape[1] - 1] == 'Iris-setosa', data.shape[1]- 1] = -1
-    
+
     x = torch.zeros((len(idx), data.shape[1] - 1))
     y = torch.zeros((len(idx), 1))
     for i, index in enumerate(idx):
@@ -52,39 +54,52 @@ def data(partition):
         x[i, 2] = torch.tensor(data[index, 2])
         x[i, 3] = torch.tensor(data[index, 3])
         y[i, 0] = torch.tensor(data[index, 4])
-    
+
     td = TensorDataset(x, y)
     return DataLoader(td, batch_size = 1024, shuffle = True)
-        
-def model(data):
-    
+
+def model(data, n_rules):
+
     # numpy and norm
     x, y = data.dataset.tensors
     x = x.numpy()
     x, minimum, maximum = normalize(data = x)
-    
+
     # cmeans
-    modelo = cmenas(k = 2)
+    # como o numero de entradas é constante n de regras = n de funcoes de 
+    # pertinencia = numero de centros
+
+    modelo = cmenas(k = n_rules)
     modelo.train(data = x, MAX = 15, tol = 1e-2)
     centros = modelo.C
-    
+
     # denorm
     centros = denormalize(data = centros, m = minimum, M = maximum)
-    
+
     def mk_var(name, centros, i):   # de iris_example
-        return (name, make_gauss_mfs(1, [centros[0, i], centros[1, i]]))
+        return (name, make_gauss_mfs(1, [centros[0, i], centros[1, i], centros[2, i]]))
+
+    def mk_var(name, centros, i):   # de iris_example
+        return (name, make_gauss_mfs(1, [centros[n, i] for n in range(n_rules)]))
+
     invardefs = [mk_var(name, centros, i) for i, name in
-                 enumerate(['SepalLengthCm', 'SepalWidthCm', 
+                 enumerate(['SepalLengthCm', 'SepalWidthCm',
                   'PetalLengthCm', 'PetalWidthCm'])]
-    
+
     outvars = ['Species']
-    
+
     model = anfis.AnfisNet('iris', invardefs, outvars)
     return model
 
 if __name__ == '__main__':
+
+    # particao de train é usada para k folds
+
     train_data = data(partition = 'train')
-    model = model(train_data)
+    model = model(train_data, 5)
+
+    # particao de teste é avaliada com os parametros determinados
+
     train_anfis(model, data = train_data, epochs = 20, show_plots = True)
     test_data = data(partition = 'test')
     test_anfis(model, data = test_data, show_plots = True)
