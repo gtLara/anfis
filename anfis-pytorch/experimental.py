@@ -47,7 +47,7 @@ def linear_model(x, y, epochs=200, hidden_size=10):
         perc_loss = 100. * torch.sqrt(tot_loss).item() / y.sum()
         errors.append(perc_loss)
         if t % 10 == 0 or epochs < 20:
-            print('epoch {:4d}: {:.5f} {:.2f}%'.format(t, tot_loss, perc_loss))
+            pass#print('epoch {:4d}: {:.5f} {:.2f}%'.format(t, tot_loss, perc_loss))
         optimizer.zero_grad()
         tot_loss.backward()
         optimizer.step()
@@ -112,15 +112,17 @@ def test_anfis(model, data, show_plots=False):
     x, y_actual = data.dataset.tensors
     if show_plots:
         plot_all_mfs(model, x)
-    print('### Testing for {} cases'.format(x.shape[0]))
+        print('### Testing for {} cases'.format(x.shape[0]))
     y_pred = model(x)
     # degrau
     y_pred = torch.sign(y_pred)
     mse, rmse, perc_loss = calc_error(y_pred, y_actual)
-    print('MS error={:.5f}, RMS error={:.5f}, percentage={:.2f}%'
-          .format(mse, rmse, perc_loss))
+    #if show_plots:print('MS error={:.5f}, RMS error={:.5f}, percentage={:.2f}%'
+          #.format(mse, rmse, perc_loss))
     if show_plots:
         plotResults(y_actual, y_pred)
+        
+    return mse, rmse, perc_loss
 
 
 def train_anfis_with(model, data, optimizer, criterion,
@@ -130,8 +132,8 @@ def train_anfis_with(model, data, optimizer, criterion,
     '''
     errors = []  # Keep a list of these for plotting afterwards
     # optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    print('### Training for {} epochs, training size = {} cases'.
-          format(epochs, data.dataset.tensors[0].shape[0]))
+    #print('### Training for {} epochs, training size = {} cases'.
+          #format(epochs, data.dataset.tensors[0].shape[0]))
     for t in range(epochs):
         # Process each mini-batch in turn:
         for x, y_actual in data:
@@ -152,8 +154,9 @@ def train_anfis_with(model, data, optimizer, criterion,
         errors.append(mse)
         # Print some progress information as the net is trained:
         if epochs < 30 or t % 10 == 0:
-            print('epoch {:4d}: MSE={:.5f}, RMSE={:.5f} ={:.2f}%'
-                  .format(t, mse, rmse, perc_loss))
+            pass
+            #print('epoch {:4d}: MSE={:.5f}, RMSE={:.5f} ={:.2f}%'
+               #   .format(t, mse, rmse, perc_loss))
     # End of training, so graph the results:
     if show_plots:
         plotErrors(errors)

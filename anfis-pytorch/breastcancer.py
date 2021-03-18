@@ -22,39 +22,61 @@ from experimental import train_anfis, test_anfis
 from cmenas import cmenas
 from norm import normalize, denormalize
 
+from sklearn.model_selection import KFold
+
 dtype = torch.float
 
-def data(partition):
+def kfold_data(idx, k=10): #assume indices preprocessados
+
+    kfold = KFold(k)
+    folds = []
+
+    for i, (train, test) in enumerate(kfold.split(idx)):
+
+        train_data, _ = data(forced_idx = train)
+        test_data, _ = data(forced_idx = test)
+        folds.append({'train':train_data, 'test':test_data})
+
+    return folds
+
+def data(partition=None, matlab=False, forced_idx=None):
     # loading data set
-    data = pd.read_csv('data/breastcancer.csv').dropna().drop(columns = ['id'])
-    # print(data.columns)
-    data = data.drop(columns = [
-                                'radius_worst', 'texture_worst', 'perimeter_worst', 'area_worst',
-                                'smoothness_worst', 'compactness_worst', 'concavity_worst',
-                                'symmetry_worst', 'fractal_dimension_worst', 'concave points_worst',
-                                'radius_se', 'texture_se', 'perimeter_se', 'area_se',
-                                'smoothness_se', 'compactness_se', 'concavity_se',
-                                'concave points_se', 'symmetry_se', 'fractal_dimension_se'
-                               ])
+    data = pd.read_csv('data/wdbc.data')
+    data = data.drop(columns = data.columns[0])
     # 70 / 30
     data = data.to_numpy()
-    # data = data[:300, :]
     length = len(data)
     idx = np.arange(length)
     np.random.shuffle(idx)
 
-    eta = 0.7
-    if partition == 'train':
-        idx = idx[:int(eta * length)]
-    if partition == 'test':
-        idx = idx[int(eta * length):]
+    if partition is not None:
+        idx = np.arange(length)
+        np.random.seed(4224)
+        np.random.shuffle(idx)
+
+        eta = 0.7
+
+        if partition == 'train':
+            idx = idx[:int(eta * length)]
+        if partition == 'test':
+            idx = idx[int(eta * length):]
+
+    if forced_idx is not None:
+        idx = forced_idx
 
     # x, y
-    x = data[idx, 1:data.shape[1]]
-    y = data[idx, 0]
-    y[y == 'B'] = -1
-    y[y == 'M'] = 1
-    data[idx, 0] = y
+    if matlab:
+        x = data[idx, 1:data.shape[1]]
+        y = data[idx, 0]
+        y[y == 'B'] = -1
+        y[y == 'M'] = 1
+        data[idx, 0] = y
+    else:
+        x = data[idx, :-1]
+        y = data[idx, -1]
+        y[y == 4] = -1
+        y[y == 2] = 1
+        data[idx, 0] = y
 
     # torch
     x = torch.tensor(np.array(x, dtype = np.float))
@@ -71,7 +93,7 @@ def data(partition):
         y[i, 0] = torch.tensor(data[index, 0])
 
     td = TensorDataset(x, y)
-    return DataLoader(td, batch_size = 1024, shuffle = True)
+    return DataLoader(td, batch_size = 1024, shuffle = True), idx
 
 def model(data, n_rules):
 
@@ -96,13 +118,10 @@ def model(data, n_rules):
     names = [
             'radius_mean', 'texture_mean', 'perimeter_mean', 'area_mean',
             'smoothness_mean', 'compactness_mean', 'concavity_mean' 'conc_mean',
-             'points_mean', 'symmetry_mean', 'fractal_dimension_mean']
-            # 'radius_se', 'texture_se', 'perimeter_se', 'area_se',
-            # 'smoothness_se', 'compactness_se', 'concavity_se' 'conc_se',
-            #  'points_se', 'symmetry_se', 'fractal_se', 'd1']
+             'points_mean', 'symmetry_mean']
 
     def mk_var(name, centros, i):
-        return (name, make_gauss_mfs(1, [centros[n, i] for n in range(n_rules)]))
+        return (name, make_gauss_mfs(3, [centros[n, i] for n in range(n_rules)]))
 
     invardefs = [mk_var(name, centros, i) for i, name in enumerate(names)]
 
@@ -112,8 +131,37 @@ def model(data, n_rules):
     return model
 
 if __name__ == '__main__':
-    train_data = data(partition = 'train')
-    modelo = model(train_data, 1)
-    train_anfis(modelo, data = train_data, epochs = 20, show_plots = False)
-    test_data = data(partition = 'test')
-    test_anfis(modelo, data = test_data, show_plots = True)
+    # train_data, _ = data(partition = 'train')
+    # modelo = model(train_data, 1)
+    # train_anfis(modelo, data = train_data, epochs = 20, show_plots = False)
+    # test_data, _ = data(partition = 'test')
+    # _, _, error = test_anfis(modelo, data = test_data, show_plots = True)
+
+
+    #######
+
+    train_data, idx = data(partition = 'train')
+    folds = kfold_data(idx)
+
+    rule_range = range(1)
+    fold_eval = np.zeros((len(rule_range), len(folds)))
+
+    for r, n_rules in enumerate(rule_range):
+        for f, fold in enumerate(folds):
+            fold_train_data = fold['train']
+            fold_test_data = fold['test']
+            anfis_model = model(fold_train_data, n_rules + 1)
+            train_anfis(anfis_model, data = fold_train_data, epochs = 20, show_plots = False)
+            _, _, perc_loss = test_anfis(anfis_model, data = fold_test_data, show_plots = False)
+            fold_eval[r, f] = perc_loss
+
+    # particao de teste é avaliada com os parametros determinados
+
+    best_n_rule = np.argmax(np.mean(fold_eval, axis=1)) + 1
+
+    anfis_model = model(train_data, best_n_rule)
+    train_anfis(anfis_model, data = train_data, epochs = 20, show_plots = False)
+    test_data, _ = data(partition = 'test')
+    _, _, error = test_anfis(anfis_model, data = test_data, show_plots = True)
+
+    print('erro percentual ={:.2f}%'.format(error))
