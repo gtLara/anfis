@@ -20,27 +20,47 @@ from experimental import train_anfis, test_anfis
 from cmenas import cmenas
 from norm import normalize, denormalize
 
+from sklearn.model_selection import KFold
+
 dtype = torch.float
 
-def kmeans_data(k=10):
-    pass
+def kfold_data(idx, k=10): #assume indices preprocessados
 
-def data(partition):
+    kfold = KFold(k)
+    folds = []
+
+    for i, (train, test) in enumerate(kfold.split(idx)):
+
+        train_data, _ = data(forced_idx = train)
+        test_data, _ = data(forced_idx = test)
+        folds.append({'train':train_data, 'test':test_data})
+
+    return folds
+
+def data(partition=None, forced_idx=None):
     # loading data set
     data = pd.read_csv('data/iris.csv').dropna().drop(columns = ['Id'])
 
-    # 70 / 30
+
     data = data.to_numpy()
     length = len(data)
-    idx = np.arange(length)
-    np.random.shuffle(idx)
 
-    eta = 0.7
+    # 70 / 30
 
-    if partition == 'train':
-        idx = idx[:int(eta * length)]
-    if partition == 'test':
-        idx = idx[int(eta * length):]
+    if partition is not None:
+        idx = np.arange(length)
+        np.random.seed(4224)
+        np.random.shuffle(idx)
+
+        eta = 0.7
+
+        if partition == 'train':
+            idx = idx[:int(eta * length)]
+        if partition == 'test':
+            idx = idx[int(eta * length):]
+
+    if forced_idx is not None:
+        idx = forced_idx
 
     # copiei do anterior pq acima deu problema de float / double
     data[data[:, data.shape[1] - 1] != 'Iris-setosa', data.shape[1]- 1] = 1
@@ -56,7 +76,7 @@ def data(partition):
         y[i, 0] = torch.tensor(data[index, 4])
 
     td = TensorDataset(x, y)
-    return DataLoader(td, batch_size = 1024, shuffle = True)
+    return DataLoader(td, batch_size = 1024, shuffle = True), idx
 
 def model(data, n_rules):
 
@@ -66,7 +86,7 @@ def model(data, n_rules):
     x, minimum, maximum = normalize(data = x)
 
     # cmeans
-    # como o numero de entradas é constante n de regras = n de funcoes de 
+    # como o numero de entradas é constante n de regras = n de funcoes de
     # pertinencia = numero de centros
 
     modelo = cmenas(k = n_rules)
@@ -95,11 +115,29 @@ if __name__ == '__main__':
 
     # particao de train é usada para k folds
 
-    train_data = data(partition = 'train')
-    model = model(train_data, 5)
+    train_data, idx = data(partition = 'train')
+    folds = kfold_data(idx)
+
+    rule_range = range(5)
+    fold_eval = np.zeros((len(rule_range), len(folds)))
+
+    for r, n_rules in enumerate(rule_range):
+        for f, fold in enumerate(folds):
+            fold_train_data = fold['train']
+            fold_test_data = fold['test']
+            print(n_rules)
+            anfis_model = model(fold_train_data, n_rules + 1)
+            train_anfis(anfis_model, data = fold_train_data, epochs = 20, show_plots = False)
+            _, _, perc_loss = test_anfis(anfis_model, data = fold_test_data, show_plots = False)
+            fold_eval[r, f] = perc_loss
 
     # particao de teste é avaliada com os parametros determinados
 
-    train_anfis(model, data = train_data, epochs = 20, show_plots = True)
-    test_data = data(partition = 'test')
-    test_anfis(model, data = test_data, show_plots = True)
+    print(fold_eval)
+
+    best_n_rule = np.argmax(np.mean(fold_eval, axis=1)) + 1
+
+    anfis_model = model(train_data, best_n_rule)
+    train_anfis(anfis_model, data = train_data, epochs = 20, show_plots = False)
+    test_data, _ = data(partition = 'test')
+    test_anfis(anfis_model, data = test_data, show_plots = True)
