@@ -27,7 +27,7 @@ dtype = torch.float
 def data(partition):
     # loading data set
     data = pd.read_csv('data/breastcancer.csv').dropna().drop(columns = ['id'])
-    print(data.columns)
+    # print(data.columns)
     data = data.drop(columns = [
                                 'radius_worst', 'texture_worst', 'perimeter_worst', 'area_worst',
                                 'smoothness_worst', 'compactness_worst', 'concavity_worst',
@@ -102,7 +102,7 @@ def model(data, n_rules):
             #  'points_se', 'symmetry_se', 'fractal_se', 'd1']
 
     def mk_var(name, centros, i):
-        return (name, make_gauss_mfs(0.2, [centros[n, i] for n in range(n_rules)]))
+        return (name, make_gauss_mfs(1, [centros[n, i] for n in range(n_rules)]))
 
     invardefs = [mk_var(name, centros, i) for i, name in enumerate(names)]
 
@@ -113,7 +113,7 @@ def model(data, n_rules):
 
 if __name__ == '__main__':
     train_data = data(partition = 'train')
-    anfis = model(train_data, 1)
-    train_anfis(anfis, data = train_data, epochs = 20, show_plots = False)
+    modelo = model(train_data, 1)
+    train_anfis(modelo, data = train_data, epochs = 20, show_plots = False)
     test_data = data(partition = 'test')
-    test_anfis(anfis, data = test_data, show_plots = True)
+    test_anfis(modelo, data = test_data, show_plots = True)
