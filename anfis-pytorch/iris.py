@@ -49,7 +49,7 @@ def data(partition=None, forced_idx=None):
 
     if partition is not None:
         idx = np.arange(length)
-        np.random.seed(4224)
+        np.random.seed(4225)
         np.random.shuffle(idx)
 
         eta = 0.7
@@ -135,7 +135,7 @@ if __name__ == '__main__':
 
     print(fold_eval)
 
-    best_n_rule = np.argmax(np.mean(fold_eval, axis=1)) + 1
+    best_n_rule = np.argmin(np.mean(fold_eval, axis=1)) + 1
 
     anfis_model = model(train_data, best_n_rule)
     train_anfis(anfis_model, data = train_data, epochs = 20, show_plots = False)
